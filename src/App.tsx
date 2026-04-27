@@ -132,8 +132,10 @@ export default function App() {
           </div>
 
           {/* Problem Display / Image Area */}
-          <div className={`
-            relative rounded-xl border border-white/10 bg-dark-surface flex items-center justify-center overflow-hidden group shadow-2xl transition-all
+          <div 
+            onClick={() => fileInputRef.current?.click()}
+            className={`
+            relative rounded-xl border border-white/10 bg-dark-surface flex items-center justify-center overflow-hidden group shadow-2xl transition-all cursor-pointer hover:border-amber-200/30
             ${messages.length > 0 ? "aspect-video md:aspect-square" : "aspect-square"}
           `}>
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(251,191,36,0.05),transparent)]"></div>
@@ -259,6 +261,13 @@ export default function App() {
             )}
 
             <div className="relative flex items-center gap-2">
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="flex-shrink-0 p-3 bg-white/5 border border-white/10 rounded-xl text-amber-200 hover:bg-white/10 transition-colors"
+                title="Add photo"
+              >
+                <Camera size={20} />
+              </button>
               <div className="flex-1 relative">
                 <input 
                   type="text" 
@@ -266,15 +275,8 @@ export default function App() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !isLoading && handleSend()}
                   placeholder="Ask a question..." 
-                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 md:py-4 px-4 md:px-6 pr-12 md:pr-16 focus:outline-none focus:border-amber-200/40 text-slate-200 placeholder-slate-600 font-sans text-sm md:text-lg transition-all"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 md:py-4 px-4 md:px-6 focus:outline-none focus:border-amber-200/40 text-slate-200 placeholder-slate-600 font-sans text-sm md:text-lg transition-all"
                 />
-                <button 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="absolute right-3 md:right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-amber-200 transition-colors"
-                  title="Add photo"
-                >
-                  <Camera size={20} />
-                </button>
               </div>
               <button 
                 disabled={isLoading || (!input && !selectedImage)}

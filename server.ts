@@ -19,10 +19,16 @@ async function startServer() {
         return res.status(500).json({ error: "API key not configured on server." });
       }
 
-      const genAI = new GoogleGenAI(apiKey);
-      const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash", 
-        systemInstruction: `You are a compassionate, patient, and Socratic Math Tutor. 
+      const ai = new GoogleGenAI({ apiKey });
+      
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview", 
+        contents: messages.map((m: any) => ({
+          role: m.role,
+          parts: m.parts,
+        })),
+        config: {
+          systemInstruction: `You are a compassionate, patient, and Socratic Math Tutor. 
 Your goal is to help students solve complex calculus and algebra problems by walking them through one step at a time.
 
 RULES:
@@ -33,20 +39,12 @@ RULES:
 5. Use Socratic questioning: ask the student what they think the next step might be or if they notice any patterns.
 6. Format math expressions clearly using LaTeX (wrap in $ for inline or $$ for block). 
 7. If the student gets a step right, praise them and move to the next single step.
-8. If they are stuck, provide a hint instead of the answer.`
-      });
-
-      const response = await model.generateContent({
-        contents: messages.map((m: any) => ({
-          role: m.role,
-          parts: m.parts,
-        })),
-        generationConfig: {
+8. If they are stuck, provide a hint instead of the answer.`,
           temperature: 0.7,
         },
       });
 
-      res.json({ text: response.response.text() });
+      res.json({ text: response.text });
     } catch (error: any) {
       console.error("Server AI Error:", error);
       res.status(500).json({ error: error.message });
