@@ -26,10 +26,34 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [lastUploadedImage, setLastUploadedImage] = useState<string | null>(null);
+  const [thinkingPhase, setThinkingPhase] = useState("");
+  const [currentStep, setCurrentStep] = useState(1);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const thinkingPhases = [
+    "Analyzing handwritten symbols...",
+    "Tracing logical connections...",
+    "Checking first principles...",
+    "Drafting Socratic guidance...",
+    "Simplifying intuition..."
+  ];
+
+  useEffect(() => {
+    let interval: any;
+    if (isLoading) {
+      let i = 0;
+      setThinkingPhase(thinkingPhases[0]);
+      interval = setInterval(() => {
+        i = (i + 1) % thinkingPhases.length;
+        setThinkingPhase(thinkingPhases[i]);
+      }, 2000);
+    }
+    return () => clearInterval(interval);
+  }, [isLoading]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -40,24 +64,34 @@ export default function App() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setIsUploading(true);
       const reader = new FileReader();
       reader.onloadend = () => {
-        setSelectedImage(reader.result as string);
+        const result = reader.result as string;
+        setSelectedImage(result);
+        setLastUploadedImage(result);
+        setIsUploading(false);
+        // Senior Dev Touch: Auto-initiate analysis if image is uploaded
+        handleSend("", result);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleSend = async (customText?: string) => {
+  const handleSend = async (customText?: string, overrideImage?: string | null) => {
     const textToSend = customText || input;
-    if (!textToSend && !selectedImage) return;
+    const imageToUse = overrideImage !== undefined ? overrideImage : selectedImage;
+    
+    // If we have an image but no text, provide a default prompt
+    const effectiveText = (!textToSend && imageToUse) ? "Help me solve this math problem step-by-step." : textToSend;
+
+    if (!effectiveText && !imageToUse) return;
 
     const userParts: any[] = [];
-    if (textToSend) userParts.push({ text: textToSend });
-    if (selectedImage) {
-      setLastUploadedImage(selectedImage);
-      const base64Data = selectedImage.split(",")[1];
-      const mimeType = selectedImage.split(";")[0].split(":")[1];
+    if (effectiveText) userParts.push({ text: effectiveText });
+    if (imageToUse) {
+      const base64Data = imageToUse.split(",")[1];
+      const mimeType = imageToUse.split(";")[0].split(":")[1];
       userParts.push({
         inlineData: {
           mimeType: mimeType,
@@ -78,10 +112,11 @@ export default function App() {
       const responseText = await chat(updatedMessages);
       if (responseText) {
         setMessages(prev => [...prev, { role: "model", parts: [{ text: responseText }] }]);
+        setCurrentStep(prev => prev + 1);
       }
     } catch (error) {
       console.error(error);
-      setMessages(prev => [...prev, { role: "model", parts: [{ text: "I'm sorry, my brain is a bit foggy. Could we try again?" }] }]);
+      setMessages(prev => [...prev, { role: "model", parts: [{ text: "The complexity here is high—let me gather my thoughts. Could you try sending that again?" }] }]);
     } finally {
       setIsLoading(false);
     }
@@ -96,6 +131,7 @@ export default function App() {
     setSelectedImage(null);
     setLastUploadedImage(null);
     setInput("");
+    setCurrentStep(1);
   };
 
   return (
@@ -133,26 +169,36 @@ export default function App() {
 
           {/* Problem Display / Image Area */}
           <div 
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => !isLoading && !isUploading && fileInputRef.current?.click()}
             className={`
             relative rounded-xl border border-white/10 bg-dark-surface flex items-center justify-center overflow-hidden group shadow-2xl transition-all cursor-pointer hover:border-amber-200/30
             ${messages.length > 0 ? "aspect-video md:aspect-square" : "aspect-square"}
           `}>
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(251,191,36,0.05),transparent)]"></div>
-            {lastUploadedImage ? (
+            
+            {isUploading ? (
+              <div className="z-20 text-center animate-pulse">
+                <RefreshCw size={32} className="mx-auto mb-2 text-amber-200 animate-spin" />
+                <p className="text-[10px] text-amber-200 uppercase tracking-widest">Uploading...</p>
+              </div>
+            ) : lastUploadedImage ? (
               <img src={lastUploadedImage} alt="Math problem" className="w-full h-full object-contain p-2 md:p-4 z-10" />
             ) : (
-              <div className="z-10 text-center p-4 md:p-8">
+              <div className="z-10 text-center p-4 md:p-8 group-hover:scale-105 transition-transform">
                 <Brain size={messages.length > 0 ? 32 : 48} className="mx-auto mb-3 md:mb-4 text-amber-200/20" />
                 <p className="font-display text-lg md:text-xl mb-1 text-text-secondary">Scan to begin</p>
                 <p className="text-[10px] text-text-muted uppercase tracking-widest hidden md:block">Patient guidance awaits</p>
               </div>
             )}
-            {/* Scanner Effect */}
+            
+            {/* Scanner Effect - Active during analysis */}
             <motion.div 
-              animate={{ top: ["0%", "100%", "0%"] }}
+              animate={{ 
+                top: ["0%", "100%", "0%"],
+                opacity: isLoading || isUploading ? 1 : 0 
+              }}
               transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-              className="absolute left-0 w-full h-[1px] bg-amber-200/20 shadow-[0_0_15px_rgba(251,191,36,0.3)] z-20 pointer-events-none"
+              className="absolute left-0 w-full h-[1px] bg-amber-200/40 shadow-[0_0_15px_rgba(251,191,36,0.5)] z-20 pointer-events-none"
             />
           </div>
 
@@ -170,8 +216,8 @@ export default function App() {
                 <p className="text-sm font-display text-amber-200/80">Socratic</p>
               </div>
               <div className="text-right">
-                <p className="text-[10px] uppercase tracking-widest text-text-muted mb-1">Status</p>
-                <p className="text-sm font-display">Active</p>
+                <p className="text-[10px] uppercase tracking-widest text-text-muted mb-1">Insight Progress</p>
+                <p className="text-sm font-display">Step {currentStep} Identified</p>
               </div>
             </div>
           </div>
@@ -230,11 +276,16 @@ export default function App() {
                 ))}
               </AnimatePresence>
               {isLoading && (
-                <div className="flex gap-4 md:gap-6 animate-pulse">
-                  <div className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-full border border-amber-200/10 flex items-center justify-center text-amber-200/30">T</div>
-                  <div className="flex-1 space-y-2 py-1">
-                    <div className="h-4 bg-white/5 rounded w-3/4"></div>
-                    <div className="h-4 bg-white/5 rounded w-1/2"></div>
+                <div className="flex gap-4 md:gap-6">
+                  <div className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-full border border-amber-200/10 flex items-center justify-center text-amber-200 animate-pulse">T</div>
+                  <div className="flex-1 space-y-4">
+                    <div className="flex items-center gap-2 text-[10px] text-amber-200/60 uppercase tracking-widest font-medium">
+                      <RefreshCw size={10} className="animate-spin" /> {thinkingPhase}
+                    </div>
+                    <div className="space-y-2 py-1">
+                      <div className="h-4 bg-white/5 rounded w-3/4 animate-pulse"></div>
+                      <div className="h-4 bg-white/5 rounded w-1/2 animate-pulse"></div>
+                    </div>
                   </div>
                 </div>
               )}
